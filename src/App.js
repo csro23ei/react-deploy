@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import './App.css';
 
+const LOCAL_URL = 'http://localhost:8080/todos';
+const REMOTE_URL = 'https://what-in-the-holy-f-f2m3p.ondigitalocean.app/';
+
 function App() {
     const [todos, setTodos] = useState([]);
     const [selected, setSelected] = useState({});
@@ -10,10 +13,30 @@ function App() {
         fetchTodos();
     }, []);
 
+    // Hämtar todos från båda endpoints och slår ihop dem
     const fetchTodos = () => {
-        fetch('http://localhost:8080/todos')
-            .then((res) => res.json())
-            .then((data) => setTodos(data));
+        Promise.all([
+                fetch(LOCAL_URL).then((res) => res.json()),
+                fetch(REMOTE_URL).then((res) => res.json())
+            ])
+            .then(([localTodos, remoteTodos]) => {
+                setTodos([...localTodos, ...remoteTodos]);
+            })
+            .catch((error) => {
+                console.error('Fel vid hämtning av todos:', error);
+                // Fallback - försök hämta från lokal bara
+                fetch(LOCAL_URL)
+                    .then((res) => res.json())
+                    .then((data) => setTodos(data));
+            });
+    };
+
+    // Hjälpfunktion för att göra samma fetch-anrop till båda servrar
+    const fetchBoth = (urlPath, options) => {
+        return Promise.all([
+            fetch(`${LOCAL_URL}${urlPath}`, options),
+            fetch(`${REMOTE_URL}${urlPath}`, options)
+        ]);
     };
 
     const handleCheckboxChange = (id) => {
@@ -25,35 +48,53 @@ function App() {
 
     const handleMarkCompleted = () => {
         const updates = todos.filter((todo) => selected[todo.id]);
-        updates.forEach((todo) => {
-            fetch(`http://localhost:8080/todos/${todo.id}`, {
+        const promises = updates.map((todo) =>
+            fetchBoth(`/${todo.id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({...todo, completed: true }),
-            }).then(fetchTodos);
-        });
-        setSelected({});
+            })
+        );
+
+        Promise.all(promises)
+            .then(() => {
+                fetchTodos();
+                setSelected({});
+            })
+            .catch((error) => console.error('Fel vid markering som klar:', error));
     };
 
     const handleAddTodo = () => {
         if (!newTodo.trim()) return;
 
-        fetch('http://localhost:8080/todos', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ title: newTodo, completed: false }),
-            })
-            .then((res) => res.json())
+        const newTodoObj = { title: newTodo, completed: false };
+
+        Promise.all([
+                fetch(LOCAL_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(newTodoObj),
+                }),
+                fetch(REMOTE_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(newTodoObj),
+                }),
+            ])
             .then(() => {
                 setNewTodo('');
                 fetchTodos();
-            });
+            })
+            .catch((error) => console.error('Fel vid tillägg av todo:', error));
     };
 
     const handleDelete = (id) => {
-        fetch(`http://localhost:8080/todos/${id}`, {
-            method: 'DELETE',
-        }).then(fetchTodos);
+        Promise.all([
+                fetch(`${LOCAL_URL}/${id}`, { method: 'DELETE' }),
+                fetch(`${REMOTE_URL}/${id}`, { method: 'DELETE' }),
+            ])
+            .then(() => fetchTodos())
+            .catch((error) => console.error('Fel vid borttagning:', error));
     };
 
     return ( <
