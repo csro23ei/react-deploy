@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import './App.css';
 
 const LOCAL_URL = 'http://localhost:8080/todos';
-const REMOTE_URL = 'https://what-in-the-holy-f-f2m3p.ondigitalocean.app/';
+const REMOTE_URL = 'https://what-in-the-holy-f-f2m3p.ondigitalocean.app/todos';
 
 function App() {
     const [todos, setTodos] = useState([]);
