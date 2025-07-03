@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import './App.css';
 
-const LOCAL_URL = 'http://localhost:8080/todos';
 const REMOTE_URL = 'https://what-in-the-holy-f-f2m3p.ondigitalocean.app/todos';
 
 function App() {
@@ -13,30 +12,19 @@ function App() {
         fetchTodos();
     }, []);
 
-    // Hämtar todos från båda endpoints och slår ihop dem
+    // Hämtar todos från remote endpoint
     const fetchTodos = () => {
-        Promise.all([
-                fetch(LOCAL_URL).then((res) => res.json()),
-                fetch(REMOTE_URL).then((res) => res.json())
-            ])
-            .then(([localTodos, remoteTodos]) => {
-                setTodos([...localTodos, ...remoteTodos]);
-            })
+        fetch(REMOTE_URL)
+            .then((res) => res.json())
+            .then((data) => setTodos(data))
             .catch((error) => {
                 console.error('Fel vid hämtning av todos:', error);
-                // Fallback - försök hämta från lokal bara
-                fetch(LOCAL_URL)
-                    .then((res) => res.json())
-                    .then((data) => setTodos(data));
             });
     };
 
-    // Hjälpfunktion för att göra samma fetch-anrop till båda servrar
-    const fetchBoth = (urlPath, options) => {
-        return Promise.all([
-            fetch(`${LOCAL_URL}${urlPath}`, options),
-            fetch(`${REMOTE_URL}${urlPath}`, options)
-        ]);
+    // Hjälpfunktion för fetch-anrop till remote server
+    const fetchRemote = (urlPath, options) => {
+        return fetch(`${REMOTE_URL}${urlPath}`, options);
     };
 
     const handleCheckboxChange = (id) => {
@@ -49,7 +37,7 @@ function App() {
     const handleMarkCompleted = () => {
         const updates = todos.filter((todo) => selected[todo.id]);
         const promises = updates.map((todo) =>
-            fetchBoth(`/${todo.id}`, {
+            fetchRemote(`/${todo.id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({...todo, completed: true }),
@@ -69,18 +57,11 @@ function App() {
 
         const newTodoObj = { title: newTodo, completed: false };
 
-        Promise.all([
-                fetch(LOCAL_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(newTodoObj),
-                }),
-                fetch(REMOTE_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(newTodoObj),
-                }),
-            ])
+        fetchRemote('', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newTodoObj),
+            })
             .then(() => {
                 setNewTodo('');
                 fetchTodos();
@@ -89,10 +70,7 @@ function App() {
     };
 
     const handleDelete = (id) => {
-        Promise.all([
-                fetch(`${LOCAL_URL}/${id}`, { method: 'DELETE' }),
-                fetch(`${REMOTE_URL}/${id}`, { method: 'DELETE' }),
-            ])
+        fetchRemote(`/${id}`, { method: 'DELETE' })
             .then(() => fetchTodos())
             .catch((error) => console.error('Fel vid borttagning:', error));
     };
